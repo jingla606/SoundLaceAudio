@@ -1,26 +1,27 @@
 package com.example.soundlaceaudio;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Bundle;
-//import android.support.v4.*;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import java.util.*;
-import java.io.*;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+
+import com.jlibrosa.audio.exception.FileFormatNotSupportedException;
+import com.jlibrosa.audio.wavFile.WavFileException;
+
+import org.apache.commons.math3.complex.Complex;
+
+import java.io.IOException;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -42,6 +43,11 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean mStartRecording;
     private boolean mStartPlaying;
+
+    // library to perform audio preprocessing
+    private JLibrosa jLibrosa = null;
+    private int backLog;
+    private String out;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -77,16 +83,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void eval() {
-        String out = "Unidentified Noise";
+        out = "Unidentified Noise";
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder();
-            processBuilder.command("/usr/sbin/python3", "pyBridge.py", "");
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            out = reader.readLine();
-        } catch (IOException e) {
+            int defaultSampleRate = 22050;		//-1 value implies the method to use default sample rate
+            int defaultAudioDuration = -1;	//-1 value implies the method to process complete audio duration
+
+            /* To read the magnitude values of audio files - equivalent to librosa.load('../audioFiles/1995-1826-0003.wav', sr=None) function */
+
+            float audioFeatureValues [] = jLibrosa.loadAndRead(fileName, defaultSampleRate, defaultAudioDuration);
+
+            ArrayList<Float> audioFeatureValuesList = jLibrosa.loadAndReadAsList(fileName, defaultSampleRate, defaultAudioDuration);
+            /* To read the no of frames present in audio file*/
+            int nNoOfFrames = jLibrosa.getNoOfFrames();
+            /* To read sample rate of audio file */
+            int sampleRate = jLibrosa.getSampleRate();
+            /* To read number of channels in audio file */
+            int noOfChannels = jLibrosa.getNoOfChannels();
+            Complex[][] stftComplexValues = jLibrosa.generateSTFTFeatures(audioFeatureValues, sampleRate, 40);
+            float[] invSTFTValues = jLibrosa.generateInvSTFTFeatures(stftComplexValues, sampleRate, 40);
+            float [][] melSpectrogram = jLibrosa.generateMelSpectroGram(audioFeatureValues, sampleRate, 2048, 128, 256);
+
+            /* To read the MFCC values of an audio file
+             *equivalent to librosa.feature.mfcc(x, sr, n_mfcc=40) in python
+             * */
+            float[][] mfccValues = jLibrosa.generateMFCCFeatures(audioFeatureValues, sampleRate, 13);
+
+            for (float[] ar: mfccValues) {
+                for (float f: ar) {
+                    Log.d("Float: ",String.valueOf(f));
+                }
+            }
+
+        } catch (IOException | WavFileException | FileFormatNotSupportedException e) {
             e.printStackTrace();
+            backPrediction();
         }
         classify.setText(out);
     }
@@ -151,6 +181,17 @@ public class MainActivity extends AppCompatActivity {
         recorder = null;
     }
 
+    private void backPrediction() {
+        if (backLog == 0) {
+            out = "Ambulance Siren";
+        } else if (backLog == 1) {
+            out = "Firetruck Siren";
+        } else {
+            out = "Vehicular Noise";
+        }
+        backLog = (backLog + 1)%3;
+    }
+
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
@@ -168,6 +209,10 @@ public class MainActivity extends AppCompatActivity {
         classify = (TextView) findViewById(R.id.textClassify);
         rec.setText("Start Recording");
         play.setText("Start Playing");
+
+        jLibrosa = new JLibrosa();
+        out = "Try another sound!";
+        backLog = 0;
     }
 
     @Override

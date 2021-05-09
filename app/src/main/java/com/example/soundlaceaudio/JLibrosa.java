@@ -1,6 +1,17 @@
 package com.example.soundlaceaudio;
 //package com.jlibrosa.audio;
 
+import android.os.Build;
+
+import androidx.annotation.RequiresApi;
+
+import com.example.soundlaceaudio.wavFile.WavFile;
+import com.jlibrosa.audio.exception.FileFormatNotSupportedException;
+import com.jlibrosa.audio.process.AudioFeatureExtraction;
+import com.jlibrosa.audio.wavFile.WavFileException;
+
+import org.apache.commons.math3.complex.Complex;
+
 import java.io.File;
 import java.io.IOException;
 import java.math.RoundingMode;
@@ -9,13 +20,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
-
-import org.apache.commons.math3.complex.Complex;
-
-import com.jlibrosa.audio.exception.FileFormatNotSupportedException;
-import com.jlibrosa.audio.process.AudioFeatureExtraction;
-import com.jlibrosa.audio.wavFile.WavFile;
-import com.jlibrosa.audio.wavFile.WavFileException;
 
 /**
  *
@@ -153,7 +157,7 @@ public class JLibrosa {
      * Feature Values.
      *
      * @param path
-     * @param sr
+     * @param sampleRate
      * @param readDurationInSeconds
      * @return
      * @throws IOException
@@ -285,6 +289,7 @@ public class JLibrosa {
      * @param nFFT
      * @return
      */
+    @RequiresApi(api = Build.VERSION_CODES.N)
     public float [] generateMeanMFCCFeatures(float[][] mfccValues, int nMFCC, int nFFT) {
         // code to take the mean of mfcc values across the rows such that
         // [nMFCC x nFFT] matrix would be converted into
@@ -334,13 +339,6 @@ public class JLibrosa {
      * This function calculates and returns the me of given Audio Sample
      * values. STFT stands for Short Term Fourier Transform
      *
-     * @param magValues
-     * @param sampleRate
-     * @param nMFCC
-     * @param nFFT
-     * @param nmels
-     * @param hop_length
-     * @return
      */
     public float[][] generateMelSpectroGram(float[] yValues, int mSampleRate, int n_fft, int n_mels, int hop_length){
         AudioFeatureExtraction mfccConvert = new AudioFeatureExtraction();
@@ -402,9 +400,6 @@ public class JLibrosa {
      * This function calculates and returns the inverse STFT values of given stft values
      * values. STFT stands for Short Term Fourier Transform
      *
-     * @param magValues
-     * @param nMFCC
-     * @return
      */
     public float [] generateInvSTFTFeatures(Complex [][] stftValues, int mSampleRate, int nMFCC, int n_fft, int n_mels, int hop_length) {
         float [] magValues = this.generateInvSTFTFeaturesWithPadOption(stftValues, mSampleRate, nMFCC, n_fft, n_mels, hop_length, -1, false);
@@ -418,9 +413,6 @@ public class JLibrosa {
      * This function calculates and returns the inverse STFT values of given stft values
      * values. STFT stands for Short Term Fourier Transform
      *
-     * @param magValues
-     * @param nMFCC
-     * @return
      */
     public float [] generateInvSTFTFeatures(Complex [][] stftValues, int mSampleRate, int nMFCC, int n_fft, int n_mels, int hop_length, int length) {
         float [] magValues = this.generateInvSTFTFeaturesWithPadOption(stftValues, mSampleRate, nMFCC, n_fft, n_mels, hop_length, length, false);
@@ -432,8 +424,6 @@ public class JLibrosa {
      * values. STFT stands for Short Term Fourier Transform
      * This function to be used for getting inverse STFT if STFT values have been generated with pad values.
      *
-     * @param magValues
-     * @param nMFCC
      * @return
      */
     public float [] generateInvSTFTFeaturesWithPadOption(Complex [][] stftValues, int mSampleRate, int nMFCC, int n_fft, int n_mels, int hop_length, int length, boolean paddingFlag) {
@@ -459,8 +449,6 @@ public class JLibrosa {
      * This function calculates and returns the inverse STFT values of given STFT Complex
      * values. STFT stands for Short Term Fourier Transform
      *
-     * @param magValues
-     * @param nMFCC
      * @return
      */
     public float [] generateInvSTFTFeatures(Complex [][] stftValues, int mSampleRate, int nMFCC) {
