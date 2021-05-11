@@ -6,6 +6,7 @@ import android.media.AudioFormat;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -15,12 +16,14 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
-import com.jlibrosa.audio.exception.FileFormatNotSupportedException;
-import com.jlibrosa.audio.wavFile.WavFileException;
-
 import org.apache.commons.math3.complex.Complex;
+import org.tensorflow.lite.DataType;
+import org.tensorflow.lite.Interpreter;
+import org.tensorflow.lite.support.common.FileUtil;
+import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
 import java.io.IOException;
+import java.nio.MappedByteBuffer;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
@@ -48,6 +51,8 @@ public class MainActivity extends AppCompatActivity {
     private JLibrosa jLibrosa = null;
     private int backLog;
     private String out;
+
+    private String context = "model1.tflite";
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -84,6 +89,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void eval() {
         out = "Unidentified Noise";
+
         try {
             int defaultSampleRate = 22050;		//-1 value implies the method to use default sample rate
             int defaultAudioDuration = -1;	//-1 value implies the method to process complete audio duration
@@ -93,11 +99,11 @@ public class MainActivity extends AppCompatActivity {
             float audioFeatureValues [] = jLibrosa.loadAndRead(fileName, defaultSampleRate, defaultAudioDuration);
 
             ArrayList<Float> audioFeatureValuesList = jLibrosa.loadAndReadAsList(fileName, defaultSampleRate, defaultAudioDuration);
-            /* To read the no of frames present in audio file*/
+            // To read the no of frames present in audio file
             int nNoOfFrames = jLibrosa.getNoOfFrames();
-            /* To read sample rate of audio file */
+            // To read sample rate of audio file
             int sampleRate = jLibrosa.getSampleRate();
-            /* To read number of channels in audio file */
+            // To read number of channels in audio file
             int noOfChannels = jLibrosa.getNoOfChannels();
             Complex[][] stftComplexValues = jLibrosa.generateSTFTFeatures(audioFeatureValues, sampleRate, 40);
             float[] invSTFTValues = jLibrosa.generateInvSTFTFeatures(stftComplexValues, sampleRate, 40);
@@ -105,19 +111,24 @@ public class MainActivity extends AppCompatActivity {
 
             /* To read the MFCC values of an audio file
              *equivalent to librosa.feature.mfcc(x, sr, n_mfcc=40) in python
-             * */
+             */
             float[][] mfccValues = jLibrosa.generateMFCCFeatures(audioFeatureValues, sampleRate, 13);
 
-            for (float[] ar: mfccValues) {
-                for (float f: ar) {
-                    Log.d("Float: ",String.valueOf(f));
-                }
+
+            // Creates inputs for reference.
+            TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, 13, 13}, DataType.FLOAT32);
+            MappedByteBuffer tfliteModel
+                    = FileUtil.loadMappedFile(context);
+            Interpreter tflite = new Interpreter(tfliteModel);
+            if (tflite != null) {
+                tflite.run();
             }
 
-        } catch (IOException | WavFileException | FileFormatNotSupportedException e) {
+        } catch (IOException | com.jlibrosa.audio.wavFile.WavFileException | com.jlibrosa.audio.exception.FileFormatNotSupportedException e) {
             e.printStackTrace();
             backPrediction();
         }
+        backPrediction();
         classify.setText(out);
     }
 
@@ -179,6 +190,14 @@ public class MainActivity extends AppCompatActivity {
         recorder.stop();
         recorder.release();
         recorder = null;
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                classify.setText("Press play!");
+            }
+        }, 1500);
+        classify.setText("Evaluating...");
     }
 
     private void backPrediction() {
